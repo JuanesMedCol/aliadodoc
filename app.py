@@ -13,7 +13,7 @@ st.set_page_config(
 
 # --- SISTEMA DE CONDUCTA (TU GEM) ---
 # 🚨 PEGA TU PROMPT COMPLETO DE CONDUCTA AQUÍ 🚨
-SISTEMA_DE_CONDUCTA = GEM_PROMPT
+SISTEMA_DE_CONDUCTA = os.environ.get("GEM_PROMPT", 'aaa')
 
 # --- Barra Lateral para Configuración ---
 with st.sidebar:
@@ -22,7 +22,7 @@ with st.sidebar:
     st.header("⚙️ Configuración")
     
     # 1. Cargar API Key desde Colab Secrets
-    api_key = GEMINI_API_KEY     
+    api_key = os.environ.get("GEMINI_API_KEY", 'aaa')     
     
     
     model_option = st.selectbox(
