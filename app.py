@@ -288,7 +288,34 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = [{
         "role": "assistant",
-        "content": "¡Hola! Soy AliadoDoc. mi funcion es apoyarte con tus necesidades documentales, puedo apoyarte igualemente con archivos de texto plano e imagenes que tengas por el momento no puedo aceptar archivos PDF, Documentos de Word o Excel, pero estos pueden ser reemplazados por markdown y csv por el momento."
+        "content": """
+        ## ¡Hola! Soy **AliadoDoc**.
+
+        Mi función es apoyarte con tus necesidades documentales ya sea con:
+
+            - Instructivos
+            - Guias
+            - Procedimientos
+
+        De igual forma, puedo asistirte en la creación, revisión y mejora de documentos institucionales.
+
+        Y como reecomendacion previa te sugiero una estructura básica para tus documentos:
+            
+            - Tipo de documento (instructivo, guía o procedimiento)
+            - Título del documento
+            - Objetivo
+            - Alcance
+            - Contexto o proceso asociado
+            - Actividades o pasos
+            - Responsables
+            - Registros o evidencias
+            - Indicaciones de formato institucional
+
+        Antes de comenzar, por favor asegúrate de haber cargado cualquier archivo que desees que revise.
+
+        ¿En qué puedo ayudarte hoy?
+        
+        """
     }]
 
 # Mostrar mensajes anteriores
