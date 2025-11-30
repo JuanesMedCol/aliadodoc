@@ -196,33 +196,10 @@ with st.sidebar:
         st.session_state.prompt_from_button = "Desearia ver ejemplos."
         st.rerun() 
 
-    # Botón 2: Descargar Formatos Esenciales
-    format_content = """
-    # Plantillas y Formatos de Proyecto
+    if st.button("Solicitar Formatos", use_container_width=True, key="fast_format_btn"):
+        st.session_state.prompt_from_button = "Me podrias dar un formato en blanco de cada tipo de documento (Instructivo, Guia y Procedimiento) en MD?."
+        st.rerun() 
 
-    Aquí tienes un esqueleto de documento:
-
-    Tipo de documento (instructivo, guía o procedimiento)
-    Título del documento
-    Objetivo
-    Alcance
-    Contexto o proceso asociado
-    Actividades o pasos
-    Responsables
-    Registros o evidencias
-    Indicaciones de formato institucional
-
-    ---
-    *Nota: En una aplicación real, estos serían enlaces directos de descarga.*
-    """
-    st.download_button(
-        label="Descargar Formatos",
-        data=format_content,
-        file_name="Formatos_Esenciales_AliadoDoc.md",
-        mime="text/markdown",
-        use_container_width=True
-    )
-    st.markdown("---")
 
     # =================================================================
     # BLOQUE DE CARGA Y PREVIEW DE ARCHIVOS (MOVIMIENTO AL SIDEBAR)
