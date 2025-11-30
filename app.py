@@ -226,11 +226,11 @@ with st.sidebar:
     # Botón 1: Asesoría Rápida (Iniciar Proyecto)
     if st.button("Asesoría Rápida", use_container_width=True, key="quick_start_btn"):
         st.session_state.prompt_from_button = """
-        Quiero que revises lo que te entregue y me indiques:
-        - Qué información falta según los campos obligatorios.
-        - Cómo completarla, con sugerencias y ejemplos ilustrativos (marcados como Ejemplo / No se usa en el documento final).
-        - Cómo ordenar o mejorar lo que ya tengo.
-        - Si no tengo nada, dame un ejemplo básico para orientarme.
+        Cordial Saludo, deseo que me apoyes con los siguientes temas:
+        - Qué información falta según los campos obligatorios y cual de la informacion disponible podria ayudarme a completarla.
+        - Cómo completarla, con sugerencias, usuando el documento suministrado y apoyar con el orden del documento.
+        - hay algun estandar documental que podria tener en cuenta para mejorar el documento?
+        - Si no tengo nada o hay algo faltante, dame un ejemplo básico para orientarme en el tema faltante.
         """
         st.rerun() 
 
