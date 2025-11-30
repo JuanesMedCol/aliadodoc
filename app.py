@@ -90,6 +90,9 @@ if 'uploaded_file_data' not in st.session_state:
     st.session_state.uploaded_file_data = None
 if 'uploaded_file_name' not in st.session_state:
     st.session_state.uploaded_file_name = None
+# Inicializar variable para prompt generado por botón
+if 'prompt_from_button' not in st.session_state:
+    st.session_state.prompt_from_button = None
 
 
 # --- Obtener contenido de la sesión para usar y mostrar ---
@@ -149,12 +152,51 @@ with st.expander("📂 Cargar Archivos (Imágenes o Texto)", expanded=True):
 # FIN DEL BLOQUE DE CARGA DE ARCHIVOS
 # =================================================================
 
+# --- BOTONES DE ACCIONES RÁPIDAS (NUEVA SECCIÓN) ---
+st.markdown("---")
+st.subheader("🚀 Acciones Rápidas")
+col1, col2 = st.columns(2)
+
+# Botón 1: Asesoría Rápida (Iniciar Proyecto)
+if col1.button("🧠 Asesoría Rápida (Iniciar Proyecto)", use_container_width=True):
+    # Almacena el prompt para ser procesado inmediatamente después del rerun
+    st.session_state.prompt_from_button = "Desearia ver ejemplos"
+    st.rerun() # Fuerza la re-ejecución del script para entrar en la lógica del chat
+
+# Botón 2: Descargar Formatos Esenciales
+format_content = """
+# Plantillas y Formatos de Proyecto
+
+Aquí tienes enlaces a formatos esenciales que podrías necesitar:
+
+Tipo de documento (instructivo, guía o procedimiento)
+Título del documento
+Objetivo
+Alcance
+Contexto o proceso asociado
+Actividades o pasos
+Responsables
+Registros o evidencias
+Indicaciones de formato institucional
+
+---
+*Nota: En una aplicación real, estos serían enlaces directos de descarga.*
+"""
+col2.download_button(
+    label="⬇️ Descargar Formatos Esenciales",
+    data=format_content,
+    file_name="Formatos_Esenciales_AliadoDoc.md",
+    mime="text/markdown",
+    use_container_width=True
+)
+st.markdown("---")
+
 # Inicializar historial de chat en session_state si no existe
 if "messages" not in st.session_state:
     # Mensaje inicial del asistente (la "gem" de bienvenida)
     st.session_state.messages = [{
         "role": "assistant",
-        "content": "¡Hola! Soy AliadoDoc. Puedes subir una imagen o archivo de texto para que lo analice, o simplemente comenzar a chatear conmigo."
+        "content": "¡Hola! Soy AliadoDoc. Puedes subir una imagen o archivo de texto para que lo analice, o usar los botones de 'Acciones Rápidas' para comenzar."
     }]
 
 # Mostrar mensajes anteriores
@@ -162,10 +204,21 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Escribe tu mensaje..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+
+# --- Lógica de Chat Unificada ---
+# 1. Obtener prompt del botón (si existe) y limpiarlo del estado de sesión.
+prompt_from_button = st.session_state.pop('prompt_from_button', None)
+# 2. Obtener prompt del input de chat.
+prompt_from_chat = st.chat_input("Escribe tu mensaje...")
+
+# Determinar el prompt final a usar
+user_prompt = prompt_from_button or prompt_from_chat
+
+if user_prompt:
+    # Agregar el mensaje del usuario al historial
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(user_prompt)
 
     if not api_key:
         st.warning("⚠️ Necesitas una API Key. Por favor, configura el Secreto de Colab llamado GEMINI_API_KEY.")
@@ -178,8 +231,8 @@ if prompt := st.chat_input("Escribe tu mensaje..."):
             content_list = []
             if processed_content: content_list.append(processed_content)
             
-            # Llamada a la API, pasando la instrucción del sistema
-            response_stream = get_gemini_response(api_key, model_option, prompt, SISTEMA_DE_CONDUCTA, content_list)
+            # Llamada a la API, pasando la instrucción del sistema y el prompt
+            response_stream = get_gemini_response(api_key, model_option, user_prompt, SISTEMA_DE_CONDUCTA, content_list)
             
             if isinstance(response_stream, str):
                 msg_placeholder.markdown(response_stream)
@@ -189,6 +242,7 @@ if prompt := st.chat_input("Escribe tu mensaje..."):
                     for chunk in response_stream:
                         if chunk.text:
                             full_response += chunk.text
+                            # Muestra la respuesta en tiempo real
                             msg_placeholder.markdown(full_response + "▌")
                     msg_placeholder.markdown(full_response)
                 except Exception as e:
