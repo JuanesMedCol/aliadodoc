@@ -342,12 +342,7 @@ if user_prompt:
                 
         # --- LIMPIEZA POST-RESPUESTA ---
         # Si se usó un archivo binario (objeto File de Gemini), se elimina después de obtener la respuesta.
-        if gemini_file_obj:
-            delete_file_from_gemini(api_key, gemini_file_obj)
-            # Limpiar el estado de sesión para el siguiente prompt
-            st.session_state.uploaded_file_data = None
-            st.session_state.uploaded_file_name = None
-            st.session_state.gemini_file_obj = None
-            st.rerun() # Forzar rerun para limpiar la referencia del archivo en la UI
-            
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": full_response
+        })
