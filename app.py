@@ -121,7 +121,11 @@ def delete_file_from_gemini(api_key, file_obj):
         pass
 
 def get_gemini_response(api_key, model_name, user_prompt, system_instruction, content_files=None):
-    """Función para interactuar con la API de Gemini con manejo de cuota y temporizador."""
+    """
+    Función para interactuar con la API de Gemini con:
+    - Manejo de cuota (429) + temporizador de reintento sugerido
+    - Fallback automático de gemini-2.5-pro -> gemini-2.5-flash (una vez)
+    """
     try:
         if api_key:
             genai.configure(api_key=api_key)
@@ -133,8 +137,6 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
         
         generation_parts = [user_prompt]
         if content_files:
-            # Filtramos el contenido. Si el proceso de subida falló (devuelve None), 
-            # no queremos incluirlo en generation_parts.
             valid_content = [c for c in content_files if c is not None]
             generation_parts.extend(valid_content)
 
@@ -145,12 +147,17 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
     except Exception as e:
         msg = str(e)
 
-        # --- Manejo de cuota / 429 ---
-        if ("429" in msg or "quota" in msg.lower() or "exceeded your current quota" in msg):
-            # Intentar extraer el tiempo de reintento desde el texto del error.
+        # ==========================
+        # 1) Manejo de cuota / 429
+        # ==========================
+        if ("429" in msg or 
+            "exceeded your current quota" in msg.lower() or
+            "quota exceeded" in msg.lower()):
+            
+            # Intentar extraer el tiempo recomendado de reintento
             retry_seconds = None
 
-            # Caso 1: "Please retry in 55.523970349s"
+            # Caso A: "Please retry in 31.830795196s"
             m = re.search(r"retry in ([0-9\.]+)s", msg)
             if m:
                 try:
@@ -158,7 +165,7 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
                 except ValueError:
                     retry_seconds = None
 
-            # Caso 2: "retry_delay { seconds: 55 }"
+            # Caso B: "retry_delay { seconds: 31 }"
             if retry_seconds is None:
                 m2 = re.search(r"retry_delay\s*\{\s*seconds:\s*([0-9]+)", msg)
                 if m2:
@@ -167,13 +174,8 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
                     except ValueError:
                         retry_seconds = None
 
-            base_msg = (
-                "⚠️ **Has alcanzado el límite de uso de la API para este modelo.**\n\n"
-                f"Modelo actual: `{model_name}`.\n\n"
-                "Esto suele ocurrir con el plan gratuito cuando se hacen muchas solicitudes "
-                "en poco tiempo o se supera el número diario permitido.\n"
-            )
-
+            # Armamos texto de tiempo amigable
+            tiempo_str = None
             if retry_seconds is not None:
                 minutos = int(retry_seconds // 60)
                 segundos = int(round(retry_seconds % 60))
@@ -182,26 +184,75 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
                 else:
                     tiempo_str = f"**{segundos} s**"
 
-                base_msg += (
-                    f"\n⏱️ Podrás reintentar aproximadamente en {tiempo_str}.\n"
-                )
+            # Si el modelo actual es PRO, intentamos un fallback automático a FLASH una sola vez
+            if model_name == "gemini-2.5-pro":
+                try:
+                    st.info(
+                        "⚠️ Se alcanzó la cuota de `gemini-2.5-pro`. "
+                        "Intentando continuar automáticamente con `gemini-2.5-flash`..."
+                    )
+                    fallback_model = genai.GenerativeModel(
+                        model_name="gemini-2.5-flash",
+                        system_instruction=system_instruction
+                    )
+                    generation_parts = [user_prompt]
+                    if content_files:
+                        valid_content = [c for c in content_files if c is not None]
+                        generation_parts.extend(valid_content)
 
+                    with st.spinner("Generando respuesta con gemini-2.5-flash..."):
+                        response = fallback_model.generate_content(generation_parts, stream=True)
+                    return response
+
+                except Exception as e2:
+                    # Si también falla flash, mostramos mensaje bonito
+                    msg2 = str(e2)
+                    base_msg = (
+                        "⚠️ **Has alcanzado el límite de uso de la API para este modelo "
+                        "y no fue posible usar el modelo de respaldo (`gemini-2.5-flash`).**\n\n"
+                        f"Modelo actual: `{model_name}`.\n"
+                    )
+                    if tiempo_str:
+                        base_msg += f"\n⏱️ La API indica que podrás volver a intentar aproximadamente en {tiempo_str}.\n"
+                    base_msg += (
+                        "\n💡 Recomendaciones:\n"
+                        "- Cambia manualmente al modelo `gemini-2.5-flash` en la barra lateral.\n"
+                        "- Revisa tu plan y facturación si necesitas más capacidad con `pro`.\n"
+                        f"\nDetalles técnicos del error original:\n```text\n{msg}\n```\n"
+                        f"Error del fallback:\n```text\n{msg2}\n```"
+                    )
+                    return base_msg
+
+            # Si NO es pro, solo mostramos el mensaje de cuota
+            base_msg = (
+                "⚠️ **Has alcanzado el límite de uso de la API para este modelo.**\n\n"
+                f"Modelo: `{model_name}`.\n"
+            )
+            if tiempo_str:
+                base_msg += f"\n⏱️ La API indica que podrás volver a intentar aproximadamente en {tiempo_str}.\n"
             base_msg += (
                 "\n💡 Recomendaciones:\n"
-                "- Cambia al modelo `gemini-2.5-flash` en la barra lateral (consume menos cuota).\n"
-                "- Si necesitas seguir usando este modelo, revisa tu plan y facturación en la consola de Google.\n"
+                "- Si estás en el plan gratuito, reduce la frecuencia de las solicitudes.\n"
+                "- Considera cambiar temporalmente a `gemini-2.5-flash` si aplica.\n"
+                "- Revisa tu plan y facturación en la consola de Google si necesitas más cuota.\n"
+                f"\nDetalles técnicos:\n```text\n{msg}\n```"
             )
             return base_msg
 
-        # --- Manejo de clave API inválida ---
+        # ==========================
+        # 2) Manejo de clave API inválida
+        # ==========================
         if "API key not valid" in msg:
             return (
                 "⚠️ **Error de Clave API**: La clave proporcionada (GEMINI_API_KEY) "
                 "no es válida o no tiene permisos. Revisa tu configuración."
             )
 
-        # --- Otros errores genéricos ---
+        # ==========================
+        # 3) Otros errores genéricos
+        # ==========================
         return f"❌ Error: {msg}"
+
 
 def process_uploaded_file(api_key, uploaded_file):
     """Procesa el archivo subido: lo convierte a PIL.Image, texto (str) o lo sube a Gemini (File object)."""
