@@ -4,6 +4,8 @@ from PIL import Image
 import io
 import os
 import time
+from pathlib import Path
+import zipfile
 
 # --- Configuración de la Página ---
 st.set_page_config(
@@ -15,6 +17,34 @@ st.set_page_config(
 # --- SISTEMA DE CONDUCTA (TU GEM) ---
 # 🚨 PEGA TU PROMPT COMPLETO DE CONDUCTA AQUÍ 🚨
 SISTEMA_DE_CONDUCTA = os.environ.get("GEM_PROMPT", 'Actúa como un asistente experto en creación de documentos institucionales.')
+
+
+# === Helpers para descargas de documentos del repositorio ===
+
+REPO_ROOT = Path(__file__).parent  # Carpeta donde está este archivo .py
+
+@st.cache_data
+def cargar_bytes_archivo(ruta_relativa: str) -> bytes:
+    """
+    Lee un archivo binario del repositorio y devuelve sus bytes.
+    ruta_relativa es relativa al archivo actual (ej: 'docs/Plantilla_Guia.docx').
+    """
+    file_path = REPO_ROOT / ruta_relativa
+    with open(file_path, "rb") as f:
+        return f.read()
+
+def crear_zip_documentos(archivos: dict) -> io.BytesIO:
+    """
+    Crea un ZIP en memoria con varios archivos.
+    archivos: dict {nombre_en_zip: bytes}
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        for nombre_zip, contenido in archivos.items():
+            zf.writestr(nombre_zip, contenido)
+    buffer.seek(0)
+    return buffer
+
 
 # --- Funciones Auxiliares para Archivos (Mantenidas) ---
 
@@ -204,9 +234,76 @@ with st.sidebar:
         """
         st.rerun() 
 
-    if st.button("Generar Formatos", use_container_width=True, key="fast_format_btn"):
-        st.session_state.prompt_from_button = "Me podrias dar un formato en blanco de cada tipo de documento (Instructivo, Guia y Procedimiento) en MD?."
-        st.rerun() 
+    # if st.button("Generar Formatos", use_container_width=True, key="fast_format_btn"):
+    #     st.session_state.prompt_from_button = "Me podrias dar un formato en blanco de cada tipo de documento (Instructivo, Guia y Procedimiento) en MD?."
+    #     st.rerun() 
+
+    # =================================================================
+    # BLOQUE DE DESCARGA DE PLANTILLAS
+    # =================================================================
+    
+    with st.expander("⬇️ Descarga de plantillas"):
+        try:
+            # Cargar bytes de las tres plantillas desde el repositorio
+            guia_bytes = cargar_bytes_archivo("docs/Plantilla_Guia.docx")
+            instructivo_bytes = cargar_bytes_archivo("docs/Plantilla_Instructivo.docx")
+            procedimiento_bytes = cargar_bytes_archivo("docs/Plantilla_Procedimiento.docx")
+    
+            # Botón para la Plantilla Guía
+            st.download_button(
+                label="📄 Descargar Plantilla Guía",
+                data=guia_bytes,
+                file_name="Plantilla_Guia.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="dl_guia"
+            )
+    
+            # Botón para la Plantilla Instructivo
+            st.download_button(
+                label="📄 Descargar Plantilla Instructivo",
+                data=instructivo_bytes,
+                file_name="Plantilla_Instructivo.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="dl_instructivo"
+            )
+    
+            # Botón para la Plantilla Procedimiento
+            st.download_button(
+                label="📄 Descargar Plantilla Procedimiento",
+                data=procedimiento_bytes,
+                file_name="Plantilla_Procedimiento.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True,
+                key="dl_procedimiento"
+            )
+    
+            # Botón para descargar todas en un ZIP
+            archivos_zip = {
+                "Plantilla_Guia.docx": guia_bytes,
+                "Plantilla_Instructivo.docx": instructivo_bytes,
+                "Plantilla_Procedimiento.docx": procedimiento_bytes,
+            }
+            zip_buffer = crear_zip_documentos(archivos_zip)
+    
+            st.download_button(
+                label="🗂️ Descargar todas las plantillas (.zip)",
+                data=zip_buffer,
+                file_name="Plantillas_AliadoDoc.zip",
+                mime="application/zip",
+                use_container_width=True,
+                key="dl_zip_all"
+            )
+    
+        except FileNotFoundError:
+            st.error(
+                "❌ No se encontraron las plantillas en el repositorio.\n\n"
+                "Asegúrate que existan en:\n"
+                "- docs/Plantilla_Guia.docx\n"
+                "- docs/Plantilla_Instructivo.docx\n"
+                "- docs/Plantilla_Procedimiento.docx"
+            )
 
 
     # =================================================================
@@ -245,7 +342,7 @@ with st.sidebar:
         st.markdown("---") 
 
     # 2. UPLOADER 
-    with st.expander("📂 Cargar Archivos", expanded=True):
+    with st.expander("📂 Cargar Archivos"):
         current_uploaded_file = st.file_uploader(
             "Arrastra tu archivo aquí (Pulsa 'Guardar' para enviarlo a la sesión de chat)", 
             type=["jpg", "png", "txt", "csv", "py", "json", "md", "pdf", "doc", "docx", "xls", "xlsx"], 
@@ -356,6 +453,37 @@ if user_prompt:
         # Llamada a la API
         response_stream = get_gemini_response(api_key, model_option, user_prompt, SISTEMA_DE_CONDUCTA, content_list)
         
+        def extraer_texto_de_chunk(chunk) -> str:
+            """
+            Extrae texto de un chunk de respuesta de Gemini de forma segura,
+            sin usar chunk.text para evitar errores cuando no hay Parts válidos.
+            """
+            try:
+                candidates = getattr(chunk, "candidates", None)
+                if not candidates:
+                    return ""
+                
+                cand = candidates[0]
+                content = getattr(cand, "content", None)
+                if not content:
+                    return ""
+                
+                parts = getattr(content, "parts", None)
+                if not parts:
+                    return ""
+                
+                textos = []
+                for part in parts:
+                    t = getattr(part, "text", None)
+                    if t:
+                        textos.append(t)
+                
+                return "".join(textos)
+            except Exception:
+                # Si la estructura no es la esperada, devolvemos vacío y ya
+                return ""
+        
+
         if isinstance(response_stream, str):
             msg_placeholder.markdown(response_stream)
             full_response = response_stream
@@ -363,16 +491,30 @@ if user_prompt:
                 st.session_state.messages.pop() 
                 st.session_state.messages.pop() 
                 st.rerun()
+
         else:
             try:
                 for chunk in response_stream:
-                    if chunk.text:
-                        full_response += chunk.text
+                    # Extraer texto de forma segura, sin usar chunk.text
+                    chunk_text = extraer_texto_de_chunk(chunk)
+                    if chunk_text:
+                        full_response += chunk_text
                         msg_placeholder.markdown(full_response + "▌")
-                msg_placeholder.markdown(full_response)
+
+                if full_response.strip():
+                    # Sí hubo texto en la respuesta
+                    msg_placeholder.markdown(full_response)
+                else:
+                    # No hubo texto en ningún chunk: probablemente bloqueo de seguridad o respuesta vacía
+                    msg_placeholder.markdown(
+                        "⚠️ El modelo no pudo devolver texto. "
+                        "Es posible que la respuesta haya sido bloqueada por las políticas "
+                        "de seguridad de Gemini o que la petición no haya generado contenido."
+                    )
             except Exception as e:
                 st.error(f"Error al procesar la respuesta del modelo: {e}")
-                
+
+
         # --- LIMPIEZA POST-RESPUESTA ---
         # Si se usó un archivo binario (objeto File de Gemini), se elimina después de obtener la respuesta.
         st.session_state.messages.append({
