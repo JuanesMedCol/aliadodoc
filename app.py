@@ -78,7 +78,7 @@ def process_uploaded_file(uploaded_file):
             return None
             
     # Si es texto (txt, py, md, csv, etc.)
-    elif mime_type.startswith('text') or mime_type == 'application/json' or uploaded_file.name.endswith(('.md', '.csv', '.doc', '.docx', '.pdf')):
+    elif mime_type.startswith('text') or mime_type == 'application/json' or uploaded_file.name.endswith(('.md', '.csv', '.doc', '.docx', '.pdf', '.xls', '.xlsx')):
         try:
             # Volvemos al inicio del buffer antes de leer
             uploaded_file.seek(0)
@@ -132,7 +132,7 @@ with st.expander("📂 Cargar Archivos (Imágenes o Texto)", expanded=True):
     # Usar un widget file_uploader para permitir la selección de archivos.
     current_uploaded_file = st.file_uploader(
         "Arrastra tu archivo aquí (Pulsa 'Guardar' para enviarlo a la sesión de chat)", 
-        type=["jpg", "png", "txt", "csv", "py", "md"], 
+        type=["jpg", "png", "txt", "csv", "md", "doc", "docx", "pdf", "xlsx", "xls"], 
         # Clave única
         key="file_uploader_widget"
     )
@@ -174,23 +174,26 @@ col1, col2 = st.columns(2)
 
 # Botón 1: Asesoría Rápida (Iniciar Proyecto)
 if col1.button("🧠 Asesoría Rápida (Iniciar Proyecto)", use_container_width=True):
-    st.session_state.prompt_from_button = "Necesito una guía rápida paso a paso para iniciar un nuevo proyecto. Asume que no tengo experiencia en gestión de proyectos."
+    st.session_state.prompt_from_button = "Desearia ver ejemplos"
     st.rerun() # Fuerza la re-ejecución del script
 
 # Botón 2: Descargar Formatos Esenciales
 format_content = """
 # Plantillas y Formatos de Proyecto
 
+# Plantillas y Formatos de Proyecto
+
 Aquí tienes enlaces a formatos esenciales que podrías necesitar:
 
-1.  **Acta de Constitución del Proyecto (Project Charter):**
-    [Link Simulado: project_charter.docx]
-
-2.  **Plan de Gestión de Riesgos:**
-    [Link Simulado: risk_management_plan.xlsx]
-
-3.  **Registro de Interesados (Stakeholder Register):**
-    [Link Simulado: stakeholder_register.xlsx]
+Tipo de documento (instructivo, guía o procedimiento)
+Título del documento
+Objetivo
+Alcance
+Contexto o proceso asociado
+Actividades o pasos
+Responsables
+Registros o evidencias
+Indicaciones de formato institucional
 
 ---
 *Nota: En una aplicación real, estos serían enlaces directos de descarga.*
