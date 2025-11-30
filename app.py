@@ -20,69 +20,71 @@ SISTEMA_DE_CONDUCTA = os.environ.get("GEM_PROMPT", 'Actúa como un asistente exp
 
 def upload_file_to_gemini(api_key, uploaded_file):
     """
-    Sube el archivo a la API de Archivos de Gemini.
-    Ahora incluye manejo específico del error de atributo para versiones antiguas de la librería.
+    Sube el archivo a la API de Archivos de Gemini usando google-generativeai.
     """
     if not api_key:
         st.error("Error: La clave API no está configurada. No se puede subir el archivo binario.")
         return None
-    
+
     try:
         genai.configure(api_key=api_key)
-        
-        # 1. Leer el archivo binario de manera segura
-        uploaded_file.seek(0)
-        file_bytes = uploaded_file.read()
 
-        # 2. Crear un buffer de bytes para la subida
-        file_data = io.BytesIO(file_bytes)
-        
-        # 3. Subir el archivo - Usamos la ruta estándar (genai.files.upload)
+        # Guardamos el archivo de Streamlit en un path temporal
+        tmp_dir = "/tmp"
+        os.makedirs(tmp_dir, exist_ok=True)
+        tmp_path = os.path.join(tmp_dir, uploaded_file.name)
+
+        uploaded_file.seek(0)
+        with open(tmp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
         with st.spinner(f"Subiendo '{uploaded_file.name}' a Gemini para análisis..."):
-             file_obj = genai.files.upload(
-                file=file_data, 
+            # SDK viejo: usa upload_file(path=...)
+            file_obj = genai.upload_file(
+                path=tmp_path,
                 display_name=uploaded_file.name,
-                mime_type=uploaded_file.type
             )
+
         st.toast("Archivo binario subido con éxito a la API de Archivos.")
         return file_obj
-        
+
     except AttributeError as e:
-        # **ESTE BLOQUE MANEJA EL ERROR CRÍTICO REPORTADO**
+        # Aquí llegarías si tu versión es TAN vieja que ni siquiera tiene upload_file
         error_msg = (
             "❌ ERROR DE COMPATIBILIDAD DE LIBRERÍA: La funcionalidad de subida de "
             "archivos binarios (PDF, DOCX, XLSX) **no está soportada** en la versión "
-            "de la biblioteca `google-generativeai` instalada en este entorno de Canvas. "
-            "Solo se pueden usar imágenes y texto plano."
+            "de la biblioteca `google-generativeai` instalada. "
+            "Actualiza el paquete `google-generativeai` a una versión reciente."
         )
         st.error(error_msg)
-        print(f"DEBUG: Error completo de subida a Gemini (Incompatibilidad de Librería): {e}") 
+        print(f"DEBUG: Error completo de subida a Gemini (Incompatibilidad de Librería): {e}")
         return None
-        
+
     except Exception as e:
-        # --- DIAGNÓSTICO DE ERRORES GENERALES ---
         error_msg = f"❌ Error general al subir archivo binario: {e}. "
         if "API key not valid" in str(e) or "authentication" in str(e):
-             error_msg += "Por favor, **REVISA TU CLAVE API (GEMINI_API_KEY)** ya que la subida a Gemini falló por autenticación."
+            error_msg += (
+                "Por favor, **REVISA TU CLAVE API (GEMINI_API_KEY)**, la subida falló por autenticación."
+            )
         elif "Unsupported" in str(e) or "format" in str(e):
-             error_msg += "El formato del archivo podría no estar completamente soportado por la API de Archivos."
-        
+            error_msg += "El formato del archivo podría no estar soportado por la API de Archivos."
         st.error(error_msg)
-        print(f"DEBUG: Error completo de subida a Gemini (General): {e}") 
+        print(f"DEBUG: Error completo de subida a Gemini (General): {e}")
         return None
+
 
 def delete_file_from_gemini(api_key, file_obj):
     """Elimina el archivo de la API de Archivos de Gemini (limpieza)."""
-    if not api_key: return
-    if not file_obj: return
+    if not api_key or not file_obj:
+        return
     try:
         genai.configure(api_key=api_key)
-        # Usamos la ruta estándar de nuevo, si falla es por el mismo problema
-        genai.files.delete(name=file_obj.name)
-        st.toast(f"Archivo de Gemini '{file_obj.display_name}' eliminado.")
+        # SDK viejo: delete_file(name=...)
+        genai.delete_file(name=file_obj.name)
+        st.toast(f"Archivo de Gemini '{getattr(file_obj, 'display_name', file_obj.name)}' eliminado.")
     except AttributeError:
-        # Silenciamos el error de AttributeError aquí, ya que sabemos que la funcionalidad no existe
-        pass 
+        # Si tampoco existe delete_file, ignoramos silenciosamente
+        pass
     except Exception as e:
         print(f"Advertencia: No se pudo eliminar el archivo de Gemini: {e}")
         pass
@@ -240,7 +242,7 @@ with st.sidebar:
     with st.expander("📂 Cargar Archivos", expanded=True):
         current_uploaded_file = st.file_uploader(
             "Arrastra tu archivo aquí (Pulsa 'Guardar' para enviarlo a la sesión de chat)", 
-            type=["jpg", "png", "txt", "csv", "py", "json", "md"], 
+            type=["jpg", "png", "txt", "csv", "py", "json", "md", "pdf", "doc", "docx", "xls", "xlsx"], 
             key="file_uploader_widget"
         )
         
