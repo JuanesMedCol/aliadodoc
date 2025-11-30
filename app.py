@@ -121,8 +121,7 @@ def delete_file_from_gemini(api_key, file_obj):
         pass
 
 def get_gemini_response(api_key, model_name, user_prompt, system_instruction, content_files=None):
-    """Función para interactuar con la API de Gemini."""
-    
+    """Función para interactuar con la API de Gemini con manejo de cuota y temporizador."""
     try:
         if api_key:
             genai.configure(api_key=api_key)
@@ -134,6 +133,8 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
         
         generation_parts = [user_prompt]
         if content_files:
+            # Filtramos el contenido. Si el proceso de subida falló (devuelve None), 
+            # no queremos incluirlo en generation_parts.
             valid_content = [c for c in content_files if c is not None]
             generation_parts.extend(valid_content)
 
@@ -142,18 +143,65 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
         return response
 
     except Exception as e:
-        if "429" in str(e) and "quota" in str(e):
-            return (
-                "⚠️ **Has alcanzado el límite diario del modelo `gemini-2.5-pro`.**\n\n"
-                "Por favor cambia al modelo **gemini-2.5-flash**, que tiene mayor capacidad "
-                "y no se bloquea tan rápido.\n\n"
-                "👉 *Sidebar → Selecciona Modelo → gemini-2.5-flash*"
-            )
-        
-        if "API key not valid" in str(e):
-            return "⚠️ Error de Clave API: La clave proporcionada no es válida."
+        msg = str(e)
 
-        return f"❌ Error: {str(e)}"
+        # --- Manejo de cuota / 429 ---
+        if ("429" in msg or "quota" in msg.lower() or "exceeded your current quota" in msg):
+            # Intentar extraer el tiempo de reintento desde el texto del error.
+            retry_seconds = None
+
+            # Caso 1: "Please retry in 55.523970349s"
+            m = re.search(r"retry in ([0-9\.]+)s", msg)
+            if m:
+                try:
+                    retry_seconds = float(m.group(1))
+                except ValueError:
+                    retry_seconds = None
+
+            # Caso 2: "retry_delay { seconds: 55 }"
+            if retry_seconds is None:
+                m2 = re.search(r"retry_delay\s*\{\s*seconds:\s*([0-9]+)", msg)
+                if m2:
+                    try:
+                        retry_seconds = float(m2.group(1))
+                    except ValueError:
+                        retry_seconds = None
+
+            base_msg = (
+                "⚠️ **Has alcanzado el límite de uso de la API para este modelo.**\n\n"
+                f"Modelo actual: `{model_name}`.\n\n"
+                "Esto suele ocurrir con el plan gratuito cuando se hacen muchas solicitudes "
+                "en poco tiempo o se supera el número diario permitido.\n"
+            )
+
+            if retry_seconds is not None:
+                minutos = int(retry_seconds // 60)
+                segundos = int(round(retry_seconds % 60))
+                if minutos > 0:
+                    tiempo_str = f"**{minutos} min {segundos} s**"
+                else:
+                    tiempo_str = f"**{segundos} s**"
+
+                base_msg += (
+                    f"\n⏱️ Podrás reintentar aproximadamente en {tiempo_str}.\n"
+                )
+
+            base_msg += (
+                "\n💡 Recomendaciones:\n"
+                "- Cambia al modelo `gemini-2.5-flash` en la barra lateral (consume menos cuota).\n"
+                "- Si necesitas seguir usando este modelo, revisa tu plan y facturación en la consola de Google.\n"
+            )
+            return base_msg
+
+        # --- Manejo de clave API inválida ---
+        if "API key not valid" in msg:
+            return (
+                "⚠️ **Error de Clave API**: La clave proporcionada (GEMINI_API_KEY) "
+                "no es válida o no tiene permisos. Revisa tu configuración."
+            )
+
+        # --- Otros errores genéricos ---
+        return f"❌ Error: {msg}"
 
 def process_uploaded_file(api_key, uploaded_file):
     """Procesa el archivo subido: lo convierte a PIL.Image, texto (str) o lo sube a Gemini (File object)."""
