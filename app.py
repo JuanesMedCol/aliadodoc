@@ -78,7 +78,7 @@ def process_uploaded_file(uploaded_file):
             return None
             
     # Si es texto (txt, py, md, csv, etc.)
-    elif mime_type.startswith('text') or mime_type == 'application/json' or uploaded_file.name.endswith(('.py', '.md', '.csv')):
+    elif mime_type.startswith('text') or mime_type == 'application/json' or uploaded_file.name.endswith(('.md', '.csv', '.doc', '.docx', '.pdf')):
         try:
             # Volvemos al inicio del buffer antes de leer
             uploaded_file.seek(0)
