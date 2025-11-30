@@ -6,6 +6,7 @@ import os
 import time
 from pathlib import Path
 import zipfile
+import re
 
 # --- Configuración de la Página ---
 st.set_page_config(
@@ -124,7 +125,7 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
     
     try:
         if api_key:
-             genai.configure(api_key=api_key)
+            genai.configure(api_key=api_key)
         
         model = genai.GenerativeModel(
             model_name=model_name,
@@ -133,17 +134,25 @@ def get_gemini_response(api_key, model_name, user_prompt, system_instruction, co
         
         generation_parts = [user_prompt]
         if content_files:
-            # Filtramos el contenido. Si el proceso de subida falló (devuelve None), 
-            # no queremos incluirlo en generation_parts.
             valid_content = [c for c in content_files if c is not None]
             generation_parts.extend(valid_content)
 
         with st.spinner("Generando respuesta..."):
-             response = model.generate_content(generation_parts, stream=True)
+            response = model.generate_content(generation_parts, stream=True)
         return response
+
     except Exception as e:
+        if "429" in str(e) and "quota" in str(e):
+            return (
+                "⚠️ **Has alcanzado el límite diario del modelo `gemini-2.5-pro`.**\n\n"
+                "Por favor cambia al modelo **gemini-2.5-flash**, que tiene mayor capacidad "
+                "y no se bloquea tan rápido.\n\n"
+                "👉 *Sidebar → Selecciona Modelo → gemini-2.5-flash*"
+            )
+        
         if "API key not valid" in str(e):
-             return "⚠️ Error de Clave API: La clave proporcionada (GEMINI_API_KEY) no es válida. Por favor, verifica tu configuración."
+            return "⚠️ Error de Clave API: La clave proporcionada no es válida."
+
         return f"❌ Error: {str(e)}"
 
 def process_uploaded_file(api_key, uploaded_file):
@@ -216,7 +225,7 @@ with st.sidebar:
     
     model_option = st.selectbox(
         "Selecciona el Modelo",
-        ("gemini-2.5-pro", "gemini-2.5-flash")
+        ("gemini-2.5-flash", "gemini-2.5-pro")
     )
     
     # --- BOTONES DE ACCIONES RÁPIDAS ---
