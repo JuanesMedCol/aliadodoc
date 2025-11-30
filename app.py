@@ -242,7 +242,7 @@ with st.sidebar:
     # BLOQUE DE DESCARGA DE PLANTILLAS
     # =================================================================
     
-    with st.expander("⬇️ Descarga de plantillas"):
+    with st.expander("📑 Descarga de Plantillas"):
         try:
             # Cargar bytes de las tres plantillas desde el repositorio
             guia_bytes = cargar_bytes_archivo("docs/Plantilla_Guia.docx")
@@ -251,7 +251,7 @@ with st.sidebar:
     
             # Botón para la Plantilla Guía
             st.download_button(
-                label="📄 Descargar Plantilla Guía",
+                label="Guía",
                 data=guia_bytes,
                 file_name="Plantilla_Guia.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -261,7 +261,7 @@ with st.sidebar:
     
             # Botón para la Plantilla Instructivo
             st.download_button(
-                label="📄 Descargar Plantilla Instructivo",
+                label="Instructivo",
                 data=instructivo_bytes,
                 file_name="Plantilla_Instructivo.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -271,7 +271,7 @@ with st.sidebar:
     
             # Botón para la Plantilla Procedimiento
             st.download_button(
-                label="📄 Descargar Plantilla Procedimiento",
+                label="Procedimiento",
                 data=procedimiento_bytes,
                 file_name="Plantilla_Procedimiento.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -288,7 +288,7 @@ with st.sidebar:
             zip_buffer = crear_zip_documentos(archivos_zip)
     
             st.download_button(
-                label="🗂️ Descargar todas las plantillas (.zip)",
+                label="🗂️ Todas",
                 data=zip_buffer,
                 file_name="Plantillas_AliadoDoc.zip",
                 mime="application/zip",
