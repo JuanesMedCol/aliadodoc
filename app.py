@@ -194,11 +194,11 @@ with st.sidebar:
     st.subheader("Acciones")
 
     # Botón 1: Asesoría Rápida (Iniciar Proyecto)
-    if st.button("Asesoría Rápida", use_container_width=True, key="quick_start_btn"):
+    if st.button("Solicitar Ejemplos", use_container_width=True, key="quick_start_btn"):
         st.session_state.prompt_from_button = "Desearia ver ejemplos."
         st.rerun() 
 
-    if st.button("Solicitar Formatos", use_container_width=True, key="fast_format_btn"):
+    if st.button("Generar Formatos", use_container_width=True, key="fast_format_btn"):
         st.session_state.prompt_from_button = "Me podrias dar un formato en blanco de cada tipo de documento (Instructivo, Guia y Procedimiento) en MD?."
         st.rerun() 
 
